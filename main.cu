@@ -2,7 +2,9 @@
 #include <stdlib.h>
 #include <math.h>
 #include "cuda_runtime.h"
-#include "timing.h"
+extern "C" {
+  #include "timing.h"
+}
 
 typedef unsigned long long bignum;
 
@@ -12,21 +14,26 @@ void checkPrimes(char * result, bignum num, bignum n);
 int totalPrimes(char * arr, int size);
 __global__ void dCheckPrimes(char * result);
 
-int main() {
+int main(int argc, char *argv[]) {
+  if(argv[1] == NULL || argv[2] == NULL) {
+    printf("Input is required of the form: \n");
+    printf("./lab1 [n -> amount to count until] [blocksize -> amount of threads per block]\n");
+    exit(1);
+  }
+
+  // doubles used for time comp
   double now, then;
   double scost, pcost;
-  bignum blockSize;
-  blockSize = 1024;
 
-
-  // bignum test = 1000.00;
   bignum *h_n, *h_s =  (bignum *) malloc(sizeof(bignum));
   h_n = (bignum *) malloc(sizeof(bignum));
-  *h_n = 1000000.00;
-  *h_s = 0.00;
+  *h_n = atoi(argv[1]);
+  bignum blockSize;
+  blockSize = atoi(argv[2]);
   char * result = (char *) malloc((*h_n + 1) *sizeof(int));
-  char * d_result = (char *) malloc((*h_n + 1) *sizeof(int));
+  char * d_result;
 
+  // find primes using cpu and measure time below
   then = currentTime();
   checkPrimes(result, 0, *h_n);
   now = currentTime();
@@ -35,6 +42,7 @@ int main() {
   int tempPrime = totalPrimes(result, (*h_n + 1));
   printf("Total primes found: %d\n", tempPrime);
 
+  // find primes using gpu and measure time below
   then = currentTime();
   cudaMalloc((void**) &d_result, *h_n * sizeof(int));
   cudaMemcpy( d_result, result, *h_n * sizeof(int), cudaMemcpyHostToDevice);
@@ -46,8 +54,11 @@ int main() {
   tempPrime = totalPrimes(result, (*h_n + 1));
   printf("Total primes found: %d\n", tempPrime);
 
+  //free used memory
   cudaFree(d_result);
   free(result);
+  free(h_n);
+  free(h_s);
 }
 
 /*
@@ -56,10 +67,15 @@ int main() {
   result -> the array that the function will return the results too
 */
 __global__ void dCheckPrimes(char * result) {
+  // get thread id which will also map to postion in array
   int id = blockIdx.x*blockDim.x+threadIdx.x;
 
+  // check if current value is 0 if so bump id to 2 (first prime)
   if (id == 0) { id += 2;}
-  else { id = id + id + 1;}
+  else { 
+    // will cause threads to skip even positions in array
+    id = id + id + 1;
+  }
   result[id] = disPrime(id);
 }
 
@@ -72,8 +88,10 @@ __global__ void dCheckPrimes(char * result) {
 void checkPrimes(char * result, bignum num, bignum n) {
   bignum i;
 
+  // if num is even add 1 to make odd
   if(num % 2 == 0) { num++; }
 
+  // go thorugh odd numbers checking if each is prime
   for(i=num; i<num+n; i = i+2) {
     result[i] = isPrime(i);
   }
