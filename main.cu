@@ -1,10 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <sys/time.h>
 #include "cuda_runtime.h"
-extern "C" {
-  #include "timing.h"
-}
 
 typedef unsigned long long bignum;
 
@@ -13,6 +11,7 @@ __device__ int disPrime(bignum num);
 void checkPrimes(char * result, bignum num, bignum n);
 int totalPrimes(char * arr, int size);
 __global__ void dCheckPrimes(char * result);
+double currentTime();
 
 int main(int argc, char *argv[]) {
   if(argv[1] == NULL || argv[2] == NULL) {
@@ -149,4 +148,12 @@ int totalPrimes(char * arr, int size) {
   }
 
   return j;
+}
+
+// current time: will return the current time.    
+double currentTime() {
+  struct timeval now;
+  gettimeofday(&now, NULL);
+
+  return now.tv_sec + now.tv_usec/1000000.0;
 }
